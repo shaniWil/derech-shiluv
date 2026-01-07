@@ -9,7 +9,9 @@ const VolunteerSchema = new Schema(
         email: {
             type: String,
             required: true,
+            lowercase: true,
             unique: true,
+            trim: true,
         },
         phone: {
             type: String,
@@ -20,6 +22,7 @@ const VolunteerSchema = new Schema(
         },
         experienceYears: {
             type: Number,
+            min: 0,
             default: 0,
         },
         placeOfWork: {

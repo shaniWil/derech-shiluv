@@ -86,5 +86,25 @@ export async function POST(request) {
 }
 
 
+export async function GET() {
 
+    try {
+        await connectToDatabase();
+
+        const volunteers = await Volunteer.find({ isActive: true })
+            .sort({ createdAt: -1 })
+            .select("name email phone profession experienceYears placesOfWork placesOfStudy");
+
+        return Response.json(volunteers, { status: 200 });
+
+    } catch (error) {
+        console.error("Error fetching volunteers:", error);
+
+        return Response.json(
+            { error: "Failed to fetch volunteers" },
+            { status: 500 }
+        );
+
+    }
+}
 

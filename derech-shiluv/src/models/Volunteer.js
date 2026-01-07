@@ -1,5 +1,4 @@
 import mongoose, { Schema, models } from "mongoose";
-import { unique } from "next/dist/build/utils";
 
 const VolunteerSchema = new Schema(
     {
@@ -23,10 +22,10 @@ const VolunteerSchema = new Schema(
             type: Number,
             default: 0,
         },
-        placesOfWork: {
+        placeOfWork: {
             type: String,
         },
-        placesOfstudy: {
+        placeOfStudy: {
             type: String,
         },
         isActive: {

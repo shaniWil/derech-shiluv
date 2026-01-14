@@ -6,6 +6,12 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 
+function parseBooleanParam(param) {
+    if (param == "true") return true;
+    if (param == "false") return false;
+    return null;
+}
+
 export async function POST(request) {
     try {
         await connectToDatabase();
@@ -18,7 +24,7 @@ export async function POST(request) {
             profession,
             experienceYears,
             placesOfWork,
-            placesOfstudy,
+            placeOfStudy,
             comments
         } = body;
 
@@ -50,21 +56,21 @@ export async function POST(request) {
             );
         }
 
-        if (experienceYears && typeof experienceYears !== "number" || experienceYears < 0) {
+        if (experienceYears !== undefined && (typeof experienceYears !== "number" || experienceYears < 0)) {
             return Response.json(
                 { error: "experience Years must be a non negative number" },
                 { status: 400 }
             );
         }
 
-        const newVolunteer = new Volunteer.create({
+        const newVolunteer = await Volunteer.create({
             name,
             email,
             phone,
             profession,
             experienceYears,
             placesOfWork,
-            placesOfstudy,
+            placeOfStudy,
             comments
         });
 
@@ -74,7 +80,7 @@ export async function POST(request) {
         if (error.code === 11000) {
             return Response.json(
                 { error: "A volunteer with this email already exists." },
-                { status: 400 }
+                { status: 409 }
             );
         }
 
@@ -86,25 +92,63 @@ export async function POST(request) {
 }
 
 
-export async function GET() {
-
+export async function GET(request) {
     try {
         await connectToDatabase();
 
-        const volunteers = await Volunteer.find({ isActive: true })
-            .sort({ createdAt: -1 })
-            .select("name email phone profession experienceYears placesOfWork placesOfStudy");
+        // TODO: auth, only admin can see all volunteers
+
+        const { searchParams } = new URL(request.url);
+
+        const q = searchParams.get("q")?.trim();
+        const profession = searchParams.get("profession")?.trim();
+        const placeOfStudy = searchParams.get("placeOfStudy")?.trim();
+        const isActiveParam = searchParams.get("isActive");
+        const sort = (searchParams.get("sort") || "createdAt").trim();
+        const order = (searchParams.get("order") || "desc").toLowerCase();
+
+        // ---- filter ----
+        const filter = {};
+
+        const isActive = parseBooleanParam(isActiveParam);
+        if (isActive !== null) filter.isActive = isActive;
+
+        if (profession) filter.profession = profession;
+
+        if (placeOfStudy) filter.placeOfStudy = placeOfStudy;
+
+        if (q) {
+            const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const regex = new RegExp(escaped, "i");
+            filter.$or = [{ name: regex }, { profession: regex }];
+        }
+
+        // ---- sort ----
+        const dir = order === "asc" ? 1 : -1;
+        let sortObj = { createdAt: -1 }; 
+
+        if (sort === "activeFirst") {
+            sortObj = { isActive: -1, createdAt: -1 };
+        } else {
+            const allowedSortFields = new Set(["profession", "createdAt", "isActive", "name", "placeOfStudy"]);
+            if (allowedSortFields.has(sort)) {
+                sortObj = { [sort]: dir };
+                if (sort === "isActive") sortObj.createdAt = -1;
+            }
+        }
+
+        const volunteers = await Volunteer.find(filter)
+            .sort(sortObj)
+            .select(
+                "name email phone profession experienceYears placesOfWork placeOfStudy comments isActive createdAt"
+            );
 
         return Response.json(volunteers, { status: 200 });
-
     } catch (error) {
-        console.error("Error fetching volunteers:", error);
-
+        console.error("GET /api/volunteers error:", error);
         return Response.json(
-            { error: "Failed to fetch volunteers" },
+            { error: "Failed to fetch volunteers." },
             { status: 500 }
         );
-
     }
 }
-
